@@ -4,15 +4,22 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from rag_chain import DiabetesAppRAG
-from models import PredictRequest, PredictResponse, UserCreate, UserResponse, Token
+from models import (
+    PredictRequest, PredictResponse, UserCreate, UserResponse, Token,
+    ForgotPasswordRequest, VerifyOTPRequest, ResetPasswordRequest,
+    ProfileUpdateRequest, HealthRecordResponse
+)
 import uvicorn
 import joblib
 import os
 import numpy as np
-from typing import Optional
+import random
+from datetime import datetime, timedelta
+from typing import Optional, List
 
 # Import DB and Auth modules
-from database import engine, Base, get_db, User, HealthRecord
+from database import engine, Base, get_db, User, HealthRecord, OTPRecord
+from email_service import send_otp_email
 from auth import (
     get_password_hash,
     verify_password,
@@ -86,6 +93,52 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
 
+@app.get("/profile", response_model=UserResponse)
+def read_profile(current_user: User = Depends(get_current_user)):
+    return current_user
+
+@app.put("/profile", response_model=UserResponse)
+def update_profile(profile: ProfileUpdateRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if profile.name is not None: current_user.name = profile.name
+    if profile.dob is not None: current_user.dob = profile.dob
+    if profile.phone is not None: current_user.phone = profile.phone
+    if profile.address is not None: current_user.address = profile.address
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+@app.post("/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == request.email).first()
+    if not user: raise HTTPException(status_code=404, detail="User not found")
+    otp_code = str(random.randint(100000, 999999))
+    expires_at = datetime.utcnow() + timedelta(minutes=10)
+    db.query(OTPRecord).filter(OTPRecord.user_id == user.id).delete()
+    db.add(OTPRecord(user_id=user.id, otp_code=otp_code, expires_at=expires_at))
+    db.commit()
+    try: await send_otp_email(user.email, otp_code)
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    return {"message": "OTP sent"}
+
+@app.post("/verify-otp")
+def verify_otp(request: VerifyOTPRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == request.email).first()
+    if not user: raise HTTPException(status_code=404, detail="User not found")
+    otp = db.query(OTPRecord).filter(OTPRecord.user_id == user.id, OTPRecord.otp_code == request.otp).first()
+    if not otp or otp.expires_at < datetime.utcnow(): raise HTTPException(status_code=400, detail="Invalid/expired OTP")
+    return {"message": "OTP verified"}
+
+@app.post("/reset-password")
+def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == request.email).first()
+    if not user: raise HTTPException(status_code=404, detail="User not found")
+    otp = db.query(OTPRecord).filter(OTPRecord.user_id == user.id, OTPRecord.otp_code == request.otp).first()
+    if not otp or otp.expires_at < datetime.utcnow(): raise HTTPException(status_code=400, detail="Invalid/expired OTP")
+    user.hashed_password = get_password_hash(request.new_password)
+    db.query(OTPRecord).filter(OTPRecord.user_id == user.id).delete()
+    db.commit()
+    return {"message": "Password updated"}
+
 # --- MAIN ENDPOINTS ---
 
 @app.post("/ask", response_model=AnswerResponse)
@@ -144,6 +197,29 @@ async def predict_diabetes(
         return {"risk_level": risk_level}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/health-records", response_model=List[HealthRecordResponse])
+def get_health_records(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(HealthRecord).filter(HealthRecord.user_id == current_user.id).order_by(HealthRecord.created_at.desc()).all()
+
+@app.put("/health-records/{record_id}", response_model=HealthRecordResponse)
+def update_health_record(record_id: int, request: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    record = db.query(HealthRecord).filter(HealthRecord.id == record_id, HealthRecord.user_id == current_user.id).first()
+    if not record: raise HTTPException(status_code=404, detail="Record not found")
+    for key, value in request.items():
+        if hasattr(record, key):
+            setattr(record, key, value)
+    db.commit()
+    db.refresh(record)
+    return record
+
+@app.delete("/health-records/{record_id}")
+def delete_health_record(record_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    record = db.query(HealthRecord).filter(HealthRecord.id == record_id, HealthRecord.user_id == current_user.id).first()
+    if not record: raise HTTPException(status_code=404, detail="Record not found")
+    db.delete(record)
+    db.commit()
+    return {"message": "Record deleted"}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))

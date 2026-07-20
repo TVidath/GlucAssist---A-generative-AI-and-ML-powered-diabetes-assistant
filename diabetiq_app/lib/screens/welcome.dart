@@ -20,12 +20,13 @@ class WelcomeScreen extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
-            child: Column(
-              children: [
-                const Spacer(flex: 2),
-                // Logo with glow effect
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
+              child: Column(
+                children: [
+                  const SizedBox(height: 40),
+                  // Logo with glow effect
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -86,7 +87,7 @@ class WelcomeScreen extends StatelessWidget {
                     height: 1.5,
                   ),
                 ),
-                const Spacer(flex: 2),
+                const SizedBox(height: 60),
                 // Continue Button
                 SizedBox(
                   width: double.infinity,
@@ -134,6 +135,7 @@ class WelcomeScreen extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }

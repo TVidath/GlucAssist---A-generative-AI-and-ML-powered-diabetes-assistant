@@ -10,6 +10,7 @@ import 'screens/about.dart';
 import 'screens/user.dart';
 import 'screens/diatrack.dart';
 import 'screens/health.dart';
+import 'screens/forgot_password.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -50,6 +51,7 @@ class DiabetesApp extends StatelessWidget {
           '/diachat': (context) => const ChatScreen(),
           '/diatrack': (context) => const DiaTrackScreen(),
           '/health': (context) => const HealthPage(),
+          '/forgot_password': (context) => const ForgotPasswordScreen(),
         },
       ),
     );

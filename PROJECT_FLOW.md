@@ -79,36 +79,112 @@ flutter run
 
 ## 🌍 How to Deploy to Production (Render)
 
-When you are ready to make the app accessible to real-time users anywhere in the world, deploy the FastAPI backend to Render.com.
+When you are ready to make the app accessible to real-time users anywhere in the world, you must deploy the FastAPI backend to the cloud. We recommend **Render.com** for hosting the backend and **Aiven.io** or **Railway.app** for hosting the MySQL database.
 
-### Step 1: Push to GitHub
+### Step 1: Set Up a Cloud Database
+Since you are using MySQL, you cannot use a local database (like localhost) for production.
+1. Create a free MySQL database on a provider like [Aiven](https://aiven.io/) or [Railway](https://railway.app/).
+2. Keep the Host, Port, User, and Password handy for the next steps.
+
+### Step 2: Push to GitHub
 1. Ensure your entire project is committed and pushed to a GitHub repository.
-2. Make sure `requirements.txt` is in your repository and contains `fastapi[standard]`, `uvicorn`, `joblib`, `xgboost`, `scikit-learn`, `langchain`, `langchain-google-genai`, etc.
+2. **IMPORTANT**: Do NOT push your `.env` file to GitHub! Keep your passwords and API keys secret.
 
-### Step 2: Create a Web Service on Render
+### Step 3: Create a Web Service on Render
 1. Go to [Render.com](https://render.com/) and create a free account.
 2. Click **New +** and select **Web Service**.
 3. Connect your GitHub account and select your DiabetIQ repository.
 
-### Step 3: Configure Render Settings
+### Step 4: Configure Render Settings
 Fill out the service details:
 - **Name**: `diabetiq-backend` (or whatever you prefer)
 - **Language**: `Python 3`
-- **Root Directory**: `diabetiq_app/backend/app` (This is crucial! Tell Render where the code lives).
-- **Build Command**: `pip install -r ../../../requirements.txt` (Adjust path if you moved requirements to the root directory).
+- **Root Directory**: `diabetiq_app/backend/app` (This tells Render where your backend code lives).
+- **Build Command**: `pip install -r ../../../requirements.txt`
 - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
 
-### Step 4: Add Environment Variables
-1. Scroll down to **Environment Variables** and click **Add Environment Variable**.
-2. Key: `GEMINI_API_KEY`
-3. Value: `your_actual_api_key_here`
+### Step 5: Add Environment Variables
+Scroll down to **Environment Variables** and add everything from your local `.env` file into Render:
+- `GOOGLE_API_KEY` = (Your Gemini API Key)
+- `DB_HOST` = (Cloud Database Host from Step 1)
+- `DB_PORT` = (Cloud Database Port)
+- `DB_USER` = (Cloud Database User)
+- `DB_PASSWORD` = (Cloud Database Password)
+- `DB_NAME` = (Cloud Database Name)
+- `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_HOST`, `SMTP_PORT`, `MAIL_FROM` = (Your Email Settings)
 
-### Step 5: Deploy and Update App
-1. Click **Create Web Service**. Render will now build and deploy your Python server. It usually takes 2-5 minutes.
-2. Once successful, Render will give you a live URL (e.g., `https://diabetiq-backend.onrender.com`).
-3. **Crucial Final Step:** Open your Flutter project (`diabetiq_app/lib/services/api_service.dart`) and change the `baseUrl`:
+### Step 6: Deploy and Connect Flutter App
+1. Click **Create Web Service**. Render will deploy your server and provide a live URL (e.g., `https://diabetiq-backend.onrender.com`).
+2. Open your Flutter project (`diabetiq_app/lib/services/api_service.dart`) and change the `baseUrl`:
    ```dart
    static const String baseUrl = "https://diabetiq-backend.onrender.com";
    ```
-4. Build the final APK: `flutter build apk`
-5. Share the APK with your users! The app will now communicate with the live Render server.
+3. Build the final app: `flutter build apk`
+4. Distribute this APK to your users!
+
+### 🔄 Pushing Future Changes (Real-Time Updates)
+**Will future changes reflect for real-time users?**
+- **Backend Changes (Python/FastAPI)**: **YES.** Because Render is connected to your GitHub, any time you push new Python backend code to GitHub, Render will automatically detect it, rebuild the server, and all real-time users will instantly interact with the updated logic.
+- **Frontend Changes (Flutter UI)**: **NO.** Because the Flutter app is physically installed on the user's phone, you must compile a new APK (`flutter build apk`) and distribute it as an update (like on the Google Play Store). Users must download the new version to see UI changes.
+
+---
+
+## 📦 Comprehensive Project Details
+
+### Core Features
+- **AI Chatbot**: An intelligent conversational agent powered by Google Gemini, designed specifically for diabetes management, diet planning, and general health queries.
+- **Risk Prediction**: A Machine Learning pipeline leveraging an XGBoost classifier (trained with SMOTE to handle data imbalance) to predict early diabetes risk based on user biometrics.
+- **User Authentication & Profiles**: Secure JWT-based authentication with editable user profiles and an integrated email-based OTP password recovery flow.
+- **Health Records Management**: Fully persistent and editable tracking of ML-generated diabetes risk predictions and health metrics.
+- **Cross-Platform Mobile App**: Built with Flutter, offering a seamless user experience across iOS and Android with modern state management (`Provider`) and local storage (`shared_preferences`).
+- **Web Interface**: A standalone Streamlit web application providing an alternative, accessible chatbot interface.
+- **Robust API Backend**: A scalable FastAPI server handling ML model inference, AI conversation routing, database management, and email dispatching for OTPs.
+
+### Tech Stack
+- **Frontend (Mobile)**: Flutter, Dart, Provider, Shared Preferences
+- **Frontend (Web)**: Streamlit, Python
+- **Backend API**: FastAPI, Python, Uvicorn, FastAPI-Mail
+- **Database & ORM**: MySQL, PyMySQL, SQLAlchemy
+- **Authentication & Security**: PyJWT, Passlib (Bcrypt)
+- **Machine Learning**: XGBoost, Scikit-learn, Pandas, Imbalanced-learn (SMOTE), Joblib
+- **Generative AI**: Google Gemini API, LangChain
+
+### Detailed Project Structure
+```text
+DiabetIQ-main/
+├── diabetiq_app/       # Main Flutter mobile application
+│   ├── lib/            # Dart source code (UI screens, State management, API Services)
+│   ├── windows/        # Windows desktop build files
+│   ├── web/            # Web platform build files
+│   └── backend/        # FastAPI backend handling ML inference & Gemini AI
+├── Streamlit/          # Standalone Streamlit chatbot implementation
+├── ML/                 # Machine learning pipeline and modeling
+│   ├── Dataset/        # Raw and processed training data for risk prediction
+│   └── Preprocessing/  # Scripts for data cleaning, scaling, and model training
+├── .env                # Environment variables configuration (e.g., GEMINI_API_KEY)
+└── requirements.txt    # Global Python dependencies for Backend, Streamlit & ML
+```
+
+### Prerequisites for Development
+- **Flutter SDK** (>= 3.0.0) for compiling the mobile application.
+- **Python** (3.8+) for running the FastAPI backend, Streamlit web app, and ML scripts.
+- **Google Gemini API Key** for enabling the generative AI medical assistant.
+- **MySQL Server** for database storage.
+- **SMTP Credentials** (e.g., Gmail App Password) for sending OTP emails.
+
+
+# 1. MySQL Database Configuration
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_mysql_password
+DB_NAME=diabetiq
+
+# 2. Email / SMTP Configuration (for sending OTPs)
+SMTP_USERNAME=your_email@gmail.com
+SMTP_PASSWORD=your_app_password
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+MAIL_FROM=your_email@gmail.com
+
+

@@ -14,7 +14,10 @@ class DiabetesAppRAG:
 
     def _setup_chat_chain(self):
         """Sets up the chat chain directly with Gemini."""
-        llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash")  # Ensure GOOGLE_API_KEY is in .env
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-3.5-flash",
+            google_api_key=os.environ.get("GOOGLE_API_KEY")
+        )
 
         prompt_template = """
         You are DiabetesApp, an AI assistant specializing in diabetes management.

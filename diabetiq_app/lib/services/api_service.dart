@@ -120,4 +120,90 @@ class ApiService {
       throw Exception('Error connecting to the server: $e');
     }
   }
+
+  // --- PASSWORD RESET ---
+  Future<void> forgotPassword(String email) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/forgot-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['detail'] ?? 'Failed to send OTP');
+    }
+  }
+
+  Future<void> verifyOtp(String email, String otp) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/verify-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'otp': otp}),
+    );
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['detail'] ?? 'Failed to verify OTP');
+    }
+  }
+
+  Future<void> resetPassword(String email, String otp, String newPassword) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/reset-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'otp': otp, 'new_password': newPassword}),
+    );
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['detail'] ?? 'Failed to reset password');
+    }
+  }
+
+  // --- PROFILE & HEALTH RECORDS ---
+  Future<Map<String, dynamic>> getProfile() async {
+    final headers = await _getAuthHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/profile'), headers: headers);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load profile');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    final headers = await _getAuthHeaders();
+    final response = await http.put(Uri.parse('$baseUrl/profile'), headers: headers, body: jsonEncode(data));
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to update profile');
+    }
+  }
+
+  Future<List<dynamic>> getHealthRecords() async {
+    final headers = await _getAuthHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/health-records'), headers: headers);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load health records');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateHealthRecord(int recordId, Map<String, dynamic> data) async {
+    final headers = await _getAuthHeaders();
+    final response = await http.put(Uri.parse('$baseUrl/health-records/$recordId'), headers: headers, body: jsonEncode(data));
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to update health record');
+    }
+  }
+
+  Future<void> deleteHealthRecord(int recordId) async {
+    final headers = await _getAuthHeaders();
+    final response = await http.delete(Uri.parse('$baseUrl/health-records/$recordId'), headers: headers);
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete health record');
+    }
+  }
 }
