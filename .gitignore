@@ -1,0 +1,7 @@
+*.DS_Store
+*my_env
+*.ipynb_checkpoints
+*.env
+*venv
+*.venv
+*flutter_app
